@@ -1,0 +1,118 @@
+---
+title: "top_maps"
+author: "Amy Tan"
+date: "4/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(maptools)
+library(ggalt)
+library(ggthemes)
+library(tibble)
+library(viridis)
+library(readxl)
+library(janitor)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r}
+italy_map <- map_data("italy")
+
+print(unique(italy_map$region))
+
+italy_map %>% distinct(region)
+  
+x <- read_xlsx("raw-data/List_school_participants_treat_control.xlsx") %>% 
+  clean_names()
+
+abbr <- read_xlsx("raw-data/italy_provinces_abbreviations.xlsx") %>% 
+  clean_names()
+
+joined <- full_join(x, abbr, by = c("province" = "ag"))
+
+joined <- joined %>% filter(!is.na(id_school)) 
+
+joined <- joined %>% group_by(province) %>% mutate(total_students_per_province = sum(num_students_top)) 
+
+# number of students per province 
+
+choro <- joined %>% group_by(agrigento) %>% summarize(total_students_per_province = mean(total_students_per_province)) %>% rename("value" = total_students_per_province) %>% rename("region" = agrigento)
+
+choro$value <- as.integer(choro$value)
+
+
+
+```
+
+```{r second_map}
+# joining with map data 
+
+joined_2 <- full_join(joined, italy_map, by = c("agrigento" = "region"))
+
+joined_2 <- joined_2 %>% filter(!is.na(id_school)) 
+
+schools_per_province_data <- joined_2 %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% 
+  mutate(schools_per_province = n) %>% rename("region" = agrigento)
+
+joined_2 %>% group_by(agrigento) %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% ungroup()
+
+# why are there NAs for lat and long??
+
+test <- joined_2 %>% group_by(agrigento) %>% mutate(count = n_distinct(q2_sch_name)) %>% group_by(q2_sch_name) %>% summarize(avg_long = mean(long), avg_lat = mean(lat), count = mean(count))
+
+#%>% summarize(avg_long = mean(long), avg_lat = mean(lat), )
+```
+
+```{r}
+
+# example choro data 
+choro_dat <- tibble(region=unique(italy_map$region),
+                          value=sample(100, length(region)))
+
+italy_proj <- "+proj=aea +lat_1=38.15040684902542+lat_2=44.925490198742295 +lon_0=12.7880859375"
+
+
+```
+
+```{r first_map}
+# map of total students by province
+
+gg <- ggplot()
+
+gg <- gg + geom_map(data=italy_map, map=italy_map,
+                      aes(long, lat, map_id=region),
+                      color="#b2b2b2", size=0.1, fill=NA)
+
+gg <- gg + geom_map(data=choro, map=italy_map,
+                      aes(fill=value, map_id=region),
+                      color="#b2b2b2", size=0.1,
+                    binwidth = 10)
+
+
+gg <- gg + scale_fill_viridis(name="Number of students enrolled") +
+  ggtitle("Number of Students Enrolled in TOP by Province")
+
+# gg <- gg + coord_proj(italy_proj)
+
+gg <- gg + theme_map()
+```
+
+```{r}
+# map of number of schools per province
+
+gg2 <- ggplot()
+
+gg2 <- gg2 + geom_map(data=italy_map, map=italy_map,
+                      aes(long, lat, map_id=region),
+                      color="#b2b2b2", size=0.1, fill=NA)
+
+gg <- gg + geom_point(data=schools_per_province_data,
+                      aes(x = long, y = lat, size=n, map_id=region),
+                      color="#b2b2b2", size=0.1)
+
+```
+
