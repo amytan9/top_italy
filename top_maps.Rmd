@@ -16,6 +16,7 @@ library(viridis)
 library(readxl)
 library(janitor)
 library(dplyr)
+library(rworldmap)
 library(tidyverse)
 ```
 
@@ -48,24 +49,6 @@ choro$value <- as.integer(choro$value)
 
 ```
 
-```{r second_map}
-# joining with map data 
-
-joined_2 <- full_join(joined, italy_map, by = c("agrigento" = "region"))
-
-joined_2 <- joined_2 %>% filter(!is.na(id_school)) 
-
-schools_per_province_data <- joined_2 %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% 
-  mutate(schools_per_province = n) %>% rename("region" = agrigento)
-
-joined_2 %>% group_by(agrigento) %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% ungroup()
-
-# why are there NAs for lat and long??
-
-test <- joined_2 %>% group_by(agrigento) %>% mutate(count = n_distinct(q2_sch_name)) %>% group_by(q2_sch_name) %>% summarize(avg_long = mean(long), avg_lat = mean(lat), count = mean(count))
-
-#%>% summarize(avg_long = mean(long), avg_lat = mean(lat), )
-```
 
 ```{r}
 
@@ -101,6 +84,30 @@ gg <- gg + scale_fill_viridis(name="Number of students enrolled") +
 gg <- gg + theme_map()
 ```
 
+```{r second_map}
+# making the average latitude and longitude of each region 
+
+italy <- italy_map %>% group_by(region) %>% summarize(avg_lat = mean(lat), avg_long = mean(long))
+
+joined$province <- toupper(joined$province)
+
+# joining with map data 
+
+joined_2 <- full_join(joined, italy, by = c("agrigento" = "region"))
+
+joined_2 <- joined_2 %>% filter(!is.na(id_school)) 
+
+# schools_per_province_data <- joined_2 %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% 
+ # mutate(schools_per_province = n) %>% rename("region" = agrigento)
+
+# joined_2 %>% group_by(agrigento) %>% group_by(agrigento) %>% distinct(q2_sch_name) %>% group_by(agrigento) %>% count() %>% ungroup()
+
+# why are there NAs for lat and long?? probably because there is no such provinces in the italy_map data
+
+test <- joined_2 %>% group_by(agrigento) %>% mutate(count = n_distinct(q2_sch_name))
+
+```
+
 ```{r}
 # map of number of schools per province
 
@@ -110,9 +117,10 @@ gg2 <- gg2 + geom_map(data=italy_map, map=italy_map,
                       aes(long, lat, map_id=region),
                       color="#b2b2b2", size=0.1, fill=NA)
 
-gg <- gg + geom_point(data=schools_per_province_data,
-                      aes(x = long, y = lat, size=n, map_id=region),
-                      color="#b2b2b2", size=0.1)
+gg2 <- gg2 + geom_point(data=test, aes(x = avg_long, y = avg_lat, size=count)) +
+  scale_size(range = c(1, 5)) +
+  ggtitle("Number of Schools Participating in TOP Per Province") +
+  theme_map()
 
 ```
 
